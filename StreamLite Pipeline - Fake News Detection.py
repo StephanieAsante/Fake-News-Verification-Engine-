@@ -157,29 +157,27 @@ if "results" not in st.session_state:
 # ---------------------------------------------------------
 @st.cache_resource
 def load_ml_components():
-    fake_news_model = joblib.load("fake_news_model.pkl")
-    tfidf_weights = joblib.load("tfidf_vectorizer.pkl")
-    onehot_weights = joblib.load("onehot_encoder.pkl")
+    fake_news_model = joblib.load("fake_news_model")
+    tfidf_weights = joblib.load("tfidf_vectorizer")
+    onehot_weights = joblib.load("onehot_encoder")
     scaler_weights = joblib.load("scaler.pkl")
     return fake_news_model, tfidf_weights, onehot_weights, scaler_weights
 
 
 @st.cache_resource
 def load_nlp_pipelines():
-    # Longformer for Sentiment Analysis
     sentiment_pipe = pipeline(
         "text-classification",
         model="allenai/longformer-base-4096",
+        framework="pt",
         truncation=True,
         max_length=4096,
     )
-    # RoBERTa Large for Emotion Detection
     emotion_pipe = pipeline(
         "text-classification",
         model="j-hartmann/emotion-english-roberta-large",
+        framework="pt",
         truncation=True,
-        max_length=512,
-    )
 
     # Dense Neural Embedding Model
     embedding_tokenizer = AutoTokenizer.from_pretrained(
