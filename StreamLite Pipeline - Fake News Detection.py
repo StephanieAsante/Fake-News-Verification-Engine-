@@ -213,7 +213,7 @@ if not weights_loaded:
     st.error(
         "⚠️ System Assets Initialization Warning\n\n"
         f"{init_error_msg}"
-        "Please verify that `fake_news_model.pkl`, `tfidf_vectorizer.pkl`, `onehot_encoder.pkl`, "
+        "Please verify that `fake_news_model`, `tfidf_vectorizer`, `onehot_encoder`, "
         "and `scaler.pkl` exist in your working directory."
     )
 
