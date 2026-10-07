@@ -3,6 +3,7 @@
 
 # %%
 # Load libraries for the process
+import gc
 import time
 import traceback
 import joblib
@@ -12,7 +13,7 @@ import requests
 import streamlit as st
 import torch
 from scipy.sparse import hstack
-from transformers import AutoModel, AutoTokenizer, pipeline
+from transformers import pipeline
 
 # ---------------------------------------------------------
 # 1. PAGE CONFIGURATION & CUSTOM DARK THEME CSS
@@ -166,29 +167,28 @@ def load_ml_components():
 
 @st.cache_resource
 def load_nlp_pipelines():
+    # Lightweight Sentiment Analysis (~250MB RAM)
     sentiment_pipe = pipeline(
         "text-classification",
-        model="allenai/longformer-base-4096",
+        model="distilbert-base-uncased-finetuned-sst-2-english",
         framework="pt",
         truncation=True,
-        max_length=4096,
+        max_length=512,
     )
+    
+    # Lightweight Emotion Detection (~260MB RAM)
     emotion_pipe = pipeline(
         "text-classification",
-        model="j-hartmann/emotion-english-roberta-large",
+        model="bhadresh-savani/distilbert-base-uncased-emotion",
         framework="pt",
         truncation=True,
-
-    # Dense Neural Embedding Model
-    embedding_tokenizer = AutoTokenizer.from_pretrained(
-        "jinaai/jina-embeddings-v2-base-en", trust_remote_code=True
+        max_length=512,
     )
-    embedding_model = AutoModel.from_pretrained(
-        "jinaai/jina-embeddings-v2-base-en", trust_remote_code=True
-    )
-    embedding_model.eval()
 
-    return sentiment_pipe, emotion_pipe, embedding_tokenizer, embedding_model
+    # Force Python Garbage Collection
+    gc.collect()
+
+    return sentiment_pipe, emotion_pipe
 
 
 # Initialization Handler with Explicit Diagnostic Errors
@@ -204,9 +204,7 @@ except Exception as e:
     init_error_msg += f"**ML Components Error:** {e}\n\n"
 
 try:
-    sentiment_pipe, emotion_pipe, emb_tokenizer, emb_model = (
-        load_nlp_pipelines()
-    )
+    sentiment_pipe, emotion_pipe = load_nlp_pipelines()
 except Exception as e:
     weights_loaded = False
     init_error_msg += f"**NLP Pipelines Error:** {e}\n\n"
@@ -264,7 +262,7 @@ def predict_article(user_title, user_text, api_key):
 
     # Step A: Dynamic NLP Inference using Transformer Pipelines (Fallback safe)
     try:
-        sentiment_res = sentiment_pipe(fully_combined_article[:4096])[0][
+        sentiment_res = sentiment_pipe(fully_combined_article[:512])[0][
             "label"
         ].lower()
     except Exception:
@@ -370,7 +368,7 @@ with st.sidebar:
     **Model Architecture:**
     - Regularized Logistic Regression ($L_1$ Lasso)
     - TF-IDF Vectorizer (10,000 N-gram terms)
-    - Sentiment (*AllenAI Longformer*) & Emotion (*DistilRoBERTa Large*)
+    - Sentiment (*DistilBERT*) & Emotion (*DistilRoBERTa*)
     - Standard Scaled Metadata Features
     
     ---
@@ -432,7 +430,7 @@ with col_output:
             )
         else:
             with st.spinner(
-                "Running NLP models (Longformer & RoBERTa) and querying external databases..."
+                "Running NLP models (DistilBERT & Emotion) and querying external databases..."
             ):
                 api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
                 try:
@@ -496,5 +494,3 @@ with col_output:
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-
