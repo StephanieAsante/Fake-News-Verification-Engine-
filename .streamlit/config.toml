@@ -1,0 +1,5 @@
+[server]
+folderWatchBlacklist = ["/home/adminuser/venv"]
+
+[runner]
+magicEnabled = false
