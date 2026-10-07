@@ -3,3 +3,10 @@ folderWatchBlacklist = ["/home/adminuser/venv"]
 
 [runner]
 magicEnabled = false
+
+[theme]
+base = "dark"
+primaryColor = "#6366f1"
+backgroundColor = "#0d0f17"
+secondaryBackgroundColor = "#1e293b"
+textColor = "#f8fafc"
