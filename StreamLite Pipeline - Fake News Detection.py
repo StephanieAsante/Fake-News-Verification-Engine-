@@ -158,9 +158,9 @@ if "results" not in st.session_state:
 # ---------------------------------------------------------
 @st.cache_resource
 def load_ml_components():
-    fake_news_model = joblib.load("fake_news_model")
+    fake_news_model = joblib.load("fake_news_detection_model")
     tfidf_weights = joblib.load("tfidf_vectorizer")
-    onehot_weights = joblib.load("onehot_encoder")
+    onehot_weights = joblib.load("one_hot_encoder")
     scaler_weights = joblib.load("scaler.pkl")
     return fake_news_model, tfidf_weights, onehot_weights, scaler_weights
 
@@ -213,7 +213,7 @@ if not weights_loaded:
     st.error(
         "⚠️ System Assets Initialization Warning\n\n"
         f"{init_error_msg}"
-        "Please verify that `fake_news_model`, `tfidf_vectorizer`, `onehot_encoder`, "
+        "Please verify that `fake_news_detection_model`, `tfidf_vectorizer`, `one_hot_encoder`, "
         "and `scaler.pkl` exist in your working directory."
     )
 
