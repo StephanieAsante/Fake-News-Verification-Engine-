@@ -261,21 +261,19 @@ def predict_article(user_title, user_text, api_key):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
     # Step A: Dynamic NLP Inference using Transformer Pipelines (Fallback safe)
-    try:
-        sentiment_res = sentiment_pipe(fully_combined_article[:512])[0][
-            "label"
-        ].lower()
-    except Exception:
-        sentiment_res = "neutral"
+try:
+    sentiment_raw = sentiment_pipe(fully_combined_article[:512])[0]["label"]
+    sentiment_res = str(sentiment_raw).capitalize()  # Converts 'negative' -> 'Negative'
+except Exception:
+    sentiment_res = "Neutral"
 
-    try:
-        emotion_res = emotion_pipe(fully_combined_article[:512])[0][
-            "label"
-        ].lower()
-    except Exception:
-        emotion_res = "neutral"
-
-    # Step B: Live API Lookup
+try:
+    emotion_raw = emotion_pipe(fully_combined_article[:512])[0]["label"]
+    emotion_res = str(emotion_raw).capitalize()  # Converts 'joy' -> 'Joy'
+except Exception:
+    emotion_res = "Neutral"
+    
+# Step B: Live API Lookup
     fact_flag, api_rating = check_google_factcheck(user_title, api_key)
 
     # Step C: Metadata Calculations
@@ -284,35 +282,40 @@ def predict_article(user_title, user_text, api_key):
     avg_word_len = char_count / word_count if word_count > 0 else 0.0
 
     # Step D: Feature Transformations
+    # 1. TF-IDF
     X_tfidf = tfidf_weights.transform([fully_combined_article])
 
-    cat_raw = [[sentiment_res, emotion_res]]
-    if hasattr(onehot_weights, "feature_names_in_"):
-        cat_df = pd.DataFrame(
-            cat_raw, columns=onehot_weights.feature_names_in_
-        )
-        X_cat = onehot_weights.transform(cat_df)
-    else:
-        X_cat = onehot_weights.transform(np.array(cat_raw))
-
+    # 2. Numerical Features
     num_raw = [[char_count, word_count, avg_word_len]]
     if hasattr(scaler_weights, "feature_names_in_"):
-        num_df = pd.DataFrame(
-            num_raw, columns=scaler_weights.feature_names_in_
-        )
+        num_df = pd.DataFrame(num_raw, columns=scaler_weights.feature_names_in_)
         X_num = scaler_weights.transform(num_df)
     else:
         X_num = scaler_weights.transform(np.array(num_raw))
 
-    # Stacking classical TF-IDF with categorical and numerical metadata
-    X_meta = np.hstack([X_cat, X_num, [[fact_flag]]])
+    # 3. Categorical Features (One-Hot Encoded)
+    cat_raw = [[sentiment_res, emotion_res]]
+    if hasattr(onehot_weights, "feature_names_in_"):
+        cat_df = pd.DataFrame(cat_raw, columns=onehot_weights.feature_names_in_)
+        X_cat = onehot_weights.transform(cat_df)
+    else:
+        X_cat = onehot_weights.transform(np.array(cat_raw))
+
+    # 4. Fact Flag
+    X_fact = np.array([[fact_flag]])
+
+ # ---------------------------------------------------------
+    # MATCHING TRAINING SEQUENCE:
+    # hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
+    # ---------------------------------------------------------
+    X_meta = np.hstack([X_num, X_cat, X_fact])
     X_final = hstack([X_tfidf, X_meta])
 
-    # Model Statistical Prediction
+    # Step E: Model Statistical Prediction
     raw_pred = fake_news_model.predict(X_final)[0]
     raw_prob = fake_news_model.predict_proba(X_final)[0][1]
 
-    # Step E: Fact-Check Database Rule Override
+    # Step F: Fact-Check Database Rule Override
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
@@ -329,14 +332,14 @@ def predict_article(user_title, user_text, api_key):
                 "pants on fire",
             ]
         ):
-            final_prediction = 0  # Force FAKE / MISINFORMATION
+            final_prediction = 0  # Misinformation / Fake
             final_prob = 0.05
             override_applied = True
         elif any(
             term in rating_lower
             for term in ["true", "accurate", "correct", "verified"]
         ):
-            final_prediction = 1  # Force REAL / VERIFIED
+            final_prediction = 1  # Verified / Real
             final_prob = 0.95
             override_applied = True
 
