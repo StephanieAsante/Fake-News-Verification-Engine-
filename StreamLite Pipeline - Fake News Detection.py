@@ -220,24 +220,25 @@ if not weights_loaded:
 # ---------------------------------------------------------
 # 3. EXTERNAL FACT-CHECKING API FUNCTION
 # ---------------------------------------------------------
-def check_google_factcheck(user_title, api_key):
-    """Passes concise title queries to Google Fact Check Tools API."""
-    if (
-        not user_title
-        or not api_key
-        or api_key == "YOUR_GOOGLE_API_KEY_HERE"
-    ):
+def check_google_factcheck(user_title, user_text, api_key):
+    """Fallback search using title first, then first sentence of body."""
+    if not api_key or api_key == "YOUR_GOOGLE_API_KEY_HERE":
+        return 0, None
+
+    # Determine query string: prefer title, fallback to first 100 chars of body
+    query_str = user_title.strip() if user_title.strip() else user_text.strip()[:100]
+    if not query_str:
         return 0, None
 
     url = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
     params = {
-        "query": user_title.strip()[:100],
+        "query": query_str[:100],
         "languageCode": "en",
         "key": api_key,
     }
 
     try:
-        response = requests.get(url, params=params, timeout=4)
+        response = requests.get(url, params=params, timeout=5)
         if response.status_code == 200:
             data = response.json()
             claims = data.get("claims", [])
