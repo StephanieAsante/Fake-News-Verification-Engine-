@@ -329,43 +329,42 @@ def predict_article(user_title, user_text, api_key):
     # ---------------------------------------------------------
     X_meta = np.hstack([X_num, X_cat, X_fact])
     X_final = hstack([X_tfidf, X_meta])
-
+    
     # Step E: Model Statistical Prediction
     raw_pred = fake_news_model.predict(X_final)[0]
-    raw_prob = fake_news_model.predict_proba(X_final)[0][1]
+    raw_prob = fake_news_model.predict_proba(X_final)[0][1]  # Prob of Class 1 (Real)
 
-    # Step F: Fact-Check Database Rule Override
+    # Step F: Fact-Check Database Rule Override & Confidence Classification
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
+    confidence_level = "High"
 
+    # Check for live API overrides first
     if fact_flag == 1 and api_rating:
         rating_lower = api_rating.lower()
-        if any(
-            term in rating_lower
-            for term in [
-                "false",
-                "fake",
-                "incorrect",
-                "misleading",
-                "pants on fire",
-            ]
-        ):
-            final_prediction = 0  # Misinformation / Fake
+        if any(term in rating_lower for term in ["false", "fake", "incorrect", "misleading", "pants on fire"]):
+            final_prediction = 0
             final_prob = 0.05
             override_applied = True
-        elif any(
-            term in rating_lower
-            for term in ["true", "accurate", "correct", "verified"]
-        ):
-            final_prediction = 1  # Verified / Real
+            confidence_level = "High (Database Override)"
+        elif any(term in rating_lower for term in ["true", "accurate", "correct", "verified"]):
+            final_prediction = 1
             final_prob = 0.95
             override_applied = True
+            confidence_level = "High (Database Override)"
 
-    # Map variables directly to dictionary keys
+    # If no database override occurred, evaluate model probability confidence
+    if not override_applied:
+        if 0.42 <= final_prob <= 0.58:
+            confidence_level = "Moderate"
+        else:
+            confidence_level = "High"
+
     return {
         "prediction": final_prediction,
         "probability": final_prob,
+        "confidence_level": confidence_level,
         "sentiment": sentiment_res,
         "emotion": emotion_res,
         "fact_flag": fact_flag,
@@ -373,7 +372,7 @@ def predict_article(user_title, user_text, api_key):
         "override_applied": override_applied,
         "char_count": raw_char_count,
         "word_count": raw_word_count,
-        "avg_word_len": raw_avg_word_len,
+        "avg_word_len": raw_avg_word_len
     }
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
@@ -467,26 +466,29 @@ with col_output:
         res = st.session_state.results
 
         # Metric Visualization Output
-        if res["prediction"] == 1:
+        if res.get("confidence_level") == "Moderate":
+            st.warning("⚠️ **Moderate Confidence Signal (Borderline Case)**")
+            st.progress(float(res["probability"]))
+            st.info(
+                f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
+                "Because this falls in the neutral zone (42%–58%), the text contains mixed stylistic signals. "
+                "Cross-referencing with official news outlets or trusted databases is recommended.")
+        elif res["prediction"] == 1:
             st.success("### ✅ VERIFIED: Likely Authentic News")
             st.progress(float(res["probability"]))
             st.write(
-                f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating"
-            )
+                f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating")
         else:
             st.error("### ⚠️ FLAG: Likely Misinformation")
             st.progress(float(1 - res["probability"]))
             st.write(
-                f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability"
-            )
-
-        if res["override_applied"]:
-            st.info(
-                "ℹ️ Output overridden by explicit match in external Fact-Check database."
-            )
-
-        st.divider()
-
+                f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability")
+        
+        # Fact-Check Database Override Banner
+    if res.get("override_applied"):
+        st.info(
+            "ℹ️ Output overridden by explicit match in external Fact-Check database.")
+    st.divider()
         # Detected NLP Metrics
         st.markdown("**Automated Transformer Feature Extraction:**")
         ncol1, ncol2 = st.columns(2)
