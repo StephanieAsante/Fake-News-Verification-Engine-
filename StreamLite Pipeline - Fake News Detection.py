@@ -260,21 +260,21 @@ def check_google_factcheck(user_title, api_key):
 def predict_article(user_title, user_text, api_key):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
-    # Step A: Dynamic NLP Inference using Transformer Pipelines (Fallback safe)
-try:
-    sentiment_raw = sentiment_pipe(fully_combined_article[:512])[0]["label"]
-    sentiment_res = str(sentiment_raw).capitalize()  # Converts 'negative' -> 'Negative'
-except Exception:
-    sentiment_res = "Neutral"
+    # Step A: Dynamic NLP Inference with Capitalized Formatting
+    try:
+        sentiment_raw = sentiment_pipe(fully_combined_article[:512])[0]["label"]
+        sentiment_res = str(sentiment_raw).capitalize()
+    except Exception:
+        sentiment_res = "Neutral"
 
-try:
-    emotion_raw = emotion_pipe(fully_combined_article[:512])[0]["label"]
-    emotion_res = str(emotion_raw).capitalize()  # Converts 'joy' -> 'Joy'
-except Exception:
-    emotion_res = "Neutral"
-    
-# Step B: Live API Lookup
-    fact_flag, api_rating = check_google_factcheck(user_title, api_key)
+    try:
+        emotion_raw = emotion_pipe(fully_combined_article[:512])[0]["label"]
+        emotion_res = str(emotion_raw).capitalize()
+    except Exception:
+        emotion_res = "Neutral"
+
+    # Step B: Live API Lookup
+    fact_flag, api_rating = check_google_factcheck(user_title, user_text, api_key)
 
     # Step C: Metadata Calculations
     char_count = len(fully_combined_article)
@@ -304,58 +304,57 @@ except Exception:
     # 4. Fact Flag
     X_fact = np.array([[fact_flag]])
 
-# ---------------------------------------------------------
-# MATCHING TRAINING SEQUENCE:
-# hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
-# ---------------------------------------------------------
-X_meta = np.hstack([X_num, X_cat, X_fact])
-X_final = hstack([X_tfidf, X_meta])
+    # ---------------------------------------------------------
+    # MATCHING TRAINING SEQUENCE:
+    # hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
+    # ---------------------------------------------------------
+    X_meta = np.hstack([X_num, X_cat, X_fact])
+    X_final = hstack([X_tfidf, X_meta])
 
-# Step E: Model Statistical Prediction
-raw_pred = fake_news_model.predict(X_final)[0]
-raw_prob = fake_news_model.predict_proba(X_final)[0][1]
+    # Step E: Model Statistical Prediction
+    raw_pred = fake_news_model.predict(X_final)[0]
+    raw_prob = fake_news_model.predict_proba(X_final)[0][1]
 
-# Step F: Fact-Check Database Rule Override
-final_prediction = raw_pred
-final_prob = raw_prob
-override_applied = False
+    # Step F: Fact-Check Database Rule Override
+    final_prediction = raw_pred
+    final_prob = raw_prob
+    override_applied = False
 
-if fact_flag == 1 and api_rating:
-    rating_lower = api_rating.lower()
-    if any(
-        term in rating_lower
-        for term in [
-            "false",
-            "fake",
-            "incorrect",
-            "misleading",
-            "pants on fire",
-        ]
-    ):
-        final_prediction = 0  # Misinformation / Fake
-        final_prob = 0.05
-        override_applied = True
-    elif any(
-        term in rating_lower
-        for term in ["true", "accurate", "correct", "verified"]
-    ):
-        final_prediction = 1  # Verified / Real
-        final_prob = 0.95
-        override_applied = True
+    if fact_flag == 1 and api_rating:
+        rating_lower = api_rating.lower()
+        if any(
+            term in rating_lower
+            for term in [
+                "false",
+                "fake",
+                "incorrect",
+                "misleading",
+                "pants on fire",
+            ]
+        ):
+            final_prediction = 0  # Misinformation / Fake
+            final_prob = 0.05
+            override_applied = True
+        elif any(
+            term in rating_lower
+            for term in ["true", "accurate", "correct", "verified"]
+        ):
+            final_prediction = 1  # Verified / Real
+            final_prob = 0.95
+            override_applied = True
 
-return {
-    "prediction": final_prediction,
-    "probability": final_prob,
-    "sentiment": sentiment_res,
-    "emotion": emotion_res,
-    "fact_flag": fact_flag,
-    "api_rating": api_rating,
-    "override_applied": override_applied,
-    "char_count": char_count,
-    "word_count": word_count,
-    "avg_word_len": avg_word_len,
-}
-
+    return {
+        "prediction": final_prediction,
+        "probability": final_prob,
+        "sentiment": sentiment_res,
+        "emotion": emotion_res,
+        "fact_flag": fact_flag,
+        "api_rating": api_rating,
+        "override_applied": override_applied,
+        "char_count": char_count,
+        "word_count": word_count,
+        "avg_word_len": avg_word_len,
+    }
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
 # ---------------------------------------------------------
