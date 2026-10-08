@@ -304,23 +304,23 @@ except Exception:
     # 4. Fact Flag
     X_fact = np.array([[fact_flag]])
 
- # ---------------------------------------------------------
-    # MATCHING TRAINING SEQUENCE:
-    # hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
-    # ---------------------------------------------------------
-    X_meta = np.hstack([X_num, X_cat, X_fact])
-    X_final = hstack([X_tfidf, X_meta])
+# ---------------------------------------------------------
+# MATCHING TRAINING SEQUENCE:
+# hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
+# ---------------------------------------------------------
+X_meta = np.hstack([X_num, X_cat, X_fact])
+X_final = hstack([X_tfidf, X_meta])
 
-    # Step E: Model Statistical Prediction
-    raw_pred = fake_news_model.predict(X_final)[0]
-    raw_prob = fake_news_model.predict_proba(X_final)[0][1]
+# Step E: Model Statistical Prediction
+raw_pred = fake_news_model.predict(X_final)[0]
+raw_prob = fake_news_model.predict_proba(X_final)[0][1]
 
-    # Step F: Fact-Check Database Rule Override
-    final_prediction = raw_pred
-    final_prob = raw_prob
-    override_applied = False
+# Step F: Fact-Check Database Rule Override
+final_prediction = raw_pred
+final_prob = raw_prob
+override_applied = False
 
-    if fact_flag == 1 and api_rating:
+if fact_flag == 1 and api_rating:
         rating_lower = api_rating.lower()
         if any(
             term in rating_lower
@@ -342,8 +342,8 @@ except Exception:
             final_prediction = 1  # Verified / Real
             final_prob = 0.95
             override_applied = True
-            
-        return {
+
+    return {
         "prediction": final_prediction,
         "probability": final_prob,
         "sentiment": sentiment_res,
@@ -354,8 +354,7 @@ except Exception:
         "char_count": char_count,
         "word_count": word_count,
         "avg_word_len": avg_word_len,
-        }
-
+    }
 
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
