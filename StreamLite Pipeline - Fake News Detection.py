@@ -321,40 +321,40 @@ final_prob = raw_prob
 override_applied = False
 
 if fact_flag == 1 and api_rating:
-        rating_lower = api_rating.lower()
-        if any(
-            term in rating_lower
-            for term in [
-                "false",
-                "fake",
-                "incorrect",
-                "misleading",
-                "pants on fire",
-            ]
-        ):
-            final_prediction = 0  # Misinformation / Fake
-            final_prob = 0.05
-            override_applied = True
-        elif any(
-            term in rating_lower
-            for term in ["true", "accurate", "correct", "verified"]
-        ):
-            final_prediction = 1  # Verified / Real
-            final_prob = 0.95
-            override_applied = True
+    rating_lower = api_rating.lower()
+    if any(
+        term in rating_lower
+        for term in [
+            "false",
+            "fake",
+            "incorrect",
+            "misleading",
+            "pants on fire",
+        ]
+    ):
+        final_prediction = 0  # Misinformation / Fake
+        final_prob = 0.05
+        override_applied = True
+    elif any(
+        term in rating_lower
+        for term in ["true", "accurate", "correct", "verified"]
+    ):
+        final_prediction = 1  # Verified / Real
+        final_prob = 0.95
+        override_applied = True
 
-    return {
-        "prediction": final_prediction,
-        "probability": final_prob,
-        "sentiment": sentiment_res,
-        "emotion": emotion_res,
-        "fact_flag": fact_flag,
-        "api_rating": api_rating,
-        "override_applied": override_applied,
-        "char_count": char_count,
-        "word_count": word_count,
-        "avg_word_len": avg_word_len,
-    }
+return {
+    "prediction": final_prediction,
+    "probability": final_prob,
+    "sentiment": sentiment_res,
+    "emotion": emotion_res,
+    "fact_flag": fact_flag,
+    "api_rating": api_rating,
+    "override_applied": override_applied,
+    "char_count": char_count,
+    "word_count": word_count,
+    "avg_word_len": avg_word_len,
+}
 
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
