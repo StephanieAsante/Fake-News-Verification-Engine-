@@ -261,7 +261,7 @@ def check_google_factcheck(user_title, user_text, api_key):
 def predict_article(user_title, user_text, api_key):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
-    # Step A: Dynamic NLP Inference with Capitalized Formatting
+    # Step A: Dynamic NLP Inference
     try:
         sentiment_raw = sentiment_pipe(fully_combined_article[:512])[0]["label"]
         sentiment_res = str(sentiment_raw).capitalize()
@@ -275,29 +275,37 @@ def predict_article(user_title, user_text, api_key):
         emotion_res = "Neutral"
 
     # Step B: Live API Lookup
-    fact_flag, api_rating = check_google_factcheck(user_title, user_text, api_key)
+    fact_flag, api_rating = check_google_factcheck(
+        user_title, user_text, api_key
+    )
 
-    # Step C: Feature Transformations
-    # 1. TF-IDF
-    X_tfidf = tfidf_weights.transform([fully_combined_article])
-    
-    # Step D: Metadata Calculations
+    # Step C: Metadata Calculations & Capping Bounds
     TRAIN_MAX_CHAR = 32655
     TRAIN_MAX_WORD = 5412
     TRAIN_MAX_AVG_WORD_LEN = 74.0
-    
+
+    # 1. Define raw counts (Used for final return display)
     raw_char_count = len(fully_combined_article)
     raw_word_count = len(fully_combined_article.split())
-    raw_avg_word_len = char_count / word_count if word_count > 0 else 0.0
+    raw_avg_word_len = (
+        raw_char_count / raw_word_count if raw_word_count > 0 else 0.0
+    )
 
+    # 2. Define capped counts (Passed to StandardScaler)
     capped_char_count = min(raw_char_count, TRAIN_MAX_CHAR)
     capped_word_count = min(raw_word_count, TRAIN_MAX_WORD)
     capped_avg_word_len = min(raw_avg_word_len, TRAIN_MAX_AVG_WORD_LEN)
 
-    # 2. Numerical Features - Transform through standardScaler safely
+    # Step D: Feature Transformations
+    # 1. TF-IDF
+    X_tfidf = tfidf_weights.transform([fully_combined_article])
+
+    # 2. Numerical Features
     num_raw = [[capped_char_count, capped_word_count, capped_avg_word_len]]
     if hasattr(scaler_weights, "feature_names_in_"):
-        num_df = pd.DataFrame(num_raw, columns=scaler_weights.feature_names_in_)
+        num_df = pd.DataFrame(
+            num_raw, columns=scaler_weights.feature_names_in_
+        )
         X_num = scaler_weights.transform(num_df)
     else:
         X_num = scaler_weights.transform(np.array(num_raw))
@@ -305,7 +313,9 @@ def predict_article(user_title, user_text, api_key):
     # 3. Categorical Features (One-Hot Encoded)
     cat_raw = [[sentiment_res, emotion_res]]
     if hasattr(onehot_weights, "feature_names_in_"):
-        cat_df = pd.DataFrame(cat_raw, columns=onehot_weights.feature_names_in_)
+        cat_df = pd.DataFrame(
+            cat_raw, columns=onehot_weights.feature_names_in_
+        )
         X_cat = onehot_weights.transform(cat_df)
     else:
         X_cat = onehot_weights.transform(np.array(cat_raw))
@@ -352,6 +362,7 @@ def predict_article(user_title, user_text, api_key):
             final_prob = 0.95
             override_applied = True
 
+    # Map variables directly to dictionary keys
     return {
         "prediction": final_prediction,
         "probability": final_prob,
