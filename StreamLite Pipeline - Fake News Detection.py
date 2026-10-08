@@ -360,9 +360,9 @@ def predict_article(user_title, user_text, api_key):
         "fact_flag": fact_flag,
         "api_rating": api_rating,
         "override_applied": override_applied,
-        "char_count": char_count,
-        "word_count": word_count,
-        "avg_word_len": avg_word_len,
+        "char_count": raw_char_count,
+        "word_count": raw_word_count,
+        "avg_word_len": raw_avg_word_len,
     }
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
