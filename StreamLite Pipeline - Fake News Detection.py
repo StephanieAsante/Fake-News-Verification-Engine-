@@ -277,17 +277,25 @@ def predict_article(user_title, user_text, api_key):
     # Step B: Live API Lookup
     fact_flag, api_rating = check_google_factcheck(user_title, user_text, api_key)
 
-    # Step C: Metadata Calculations
-    char_count = len(fully_combined_article)
-    word_count = len(fully_combined_article.split())
-    avg_word_len = char_count / word_count if word_count > 0 else 0.0
-
-    # Step D: Feature Transformations
+    # Step C: Feature Transformations
     # 1. TF-IDF
     X_tfidf = tfidf_weights.transform([fully_combined_article])
+    
+    # Step D: Metadata Calculations
+    TRAIN_MAX_CHAR = 32655
+    TRAIN_MAX_WORD = 5412
+    TRAIN_MAX_AVG_WORD_LEN = 74.0
+    
+    raw_char_count = len(fully_combined_article)
+    raw_word_count = len(fully_combined_article.split())
+    raw_avg_word_len = char_count / word_count if word_count > 0 else 0.0
 
-    # 2. Numerical Features
-    num_raw = [[char_count, word_count, avg_word_len]]
+    capped_char_count = min(raw_char_count, TRAIN_MAX_CHAR)
+    capped_word_count = min(raw_word_count, TRAIN_MAX_WORD)
+    capped_avg_word_len = min(raw_avg_word_len, TRAIN_MAX_AVG_WORD_LEN)
+
+    # 2. Numerical Features - Transform through standardScaler safely
+    num_raw = [[capped_char_count, capped_word_count, capped_avg_word_len]]
     if hasattr(scaler_weights, "feature_names_in_"):
         num_df = pd.DataFrame(num_raw, columns=scaler_weights.feature_names_in_)
         X_num = scaler_weights.transform(num_df)
