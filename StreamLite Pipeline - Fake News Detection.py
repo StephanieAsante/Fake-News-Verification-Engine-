@@ -342,8 +342,8 @@ except Exception:
             final_prediction = 1  # Verified / Real
             final_prob = 0.95
             override_applied = True
-
-    return {
+            
+            return {
         "prediction": final_prediction,
         "probability": final_prob,
         "sentiment": sentiment_res,
@@ -354,7 +354,7 @@ except Exception:
         "char_count": char_count,
         "word_count": word_count,
         "avg_word_len": avg_word_len,
-    }
+            }
 
 
 # ---------------------------------------------------------
