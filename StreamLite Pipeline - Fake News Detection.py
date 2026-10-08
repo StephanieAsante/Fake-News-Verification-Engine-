@@ -472,23 +472,29 @@ with col_output:
             st.info(
                 f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
                 "Because this falls in the neutral zone (42%–58%), the text contains mixed stylistic signals. "
-                "Cross-referencing with official news outlets or trusted databases is recommended.")
+                "Cross-referencing with official news outlets or trusted databases is recommended."
+            )
         elif res["prediction"] == 1:
             st.success("### ✅ VERIFIED: Likely Authentic News")
             st.progress(float(res["probability"]))
             st.write(
-                f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating")
+                f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating"
+            )
         else:
             st.error("### ⚠️ FLAG: Likely Misinformation")
             st.progress(float(1 - res["probability"]))
             st.write(
-                f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability")
-        
+                f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability"
+            )
+
         # Fact-Check Database Override Banner
-    if res.get("override_applied"):
-        st.info(
-            "ℹ️ Output overridden by explicit match in external Fact-Check database.")
-    st.divider()
+        if res.get("override_applied"):
+            st.info(
+                "ℹ️ Output overridden by explicit match in external Fact-Check database."
+            )
+
+        st.divider()
+
         # Detected NLP Metrics
         st.markdown("**Automated Transformer Feature Extraction:**")
         ncol1, ncol2 = st.columns(2)
