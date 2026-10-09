@@ -312,8 +312,12 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
         emotion_res = "Neutral"
 
     # Step B: Live API Lookup
-    fact_flag, api_rating = check_google_factcheck(user_title, user_text, google_api_key)
-    news_found, publisher_name, article_url = check_news_hub(user_title, user_text, news_api_key)
+    fact_flag, api_rating = check_google_factcheck(
+        user_title, user_text, google_api_key
+    )
+    news_found, publisher_name, article_url = check_news_hub(
+        user_title, user_text, news_api_key
+    )
 
     # Step C: Metadata Calculations & Capping Bounds
     TRAIN_MAX_CHAR = 32655
@@ -365,12 +369,12 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     # ---------------------------------------------------------
     X_meta = np.hstack([X_num, X_cat, X_fact])
     X_final = hstack([X_tfidf, X_meta])
-    
+
     # Step E: Model Statistical Prediction
     raw_pred = fake_news_model.predict(X_final)[0]
     raw_prob = fake_news_model.predict_proba(X_final)[0][1]  # Prob of Class 1 (Real)
-    
-    #Step F: Database Overrides & Statistical Confidence Classification
+
+    # Step F: Database Overrides & Statistical Confidence Classification
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
@@ -402,7 +406,7 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
 
-    # 2. PRIORITY 2: News Hub Match (Fixed Indentation)
+    # 2. PRIORITY 2: News Hub Match (Fixed Alignment)
     elif news_found == 1:
         final_prediction = 1  # Confirmed Verified / Authentic
         final_prob = max(raw_prob, 0.92)  # Set high credibility floor
@@ -434,7 +438,6 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
         "word_count": raw_word_count,
         "avg_word_len": raw_avg_word_len,
     }
-
 
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
