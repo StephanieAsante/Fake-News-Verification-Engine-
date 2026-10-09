@@ -522,7 +522,7 @@ with col_output:
                     st.session_state.results = predict_article(
                         user_title=user_title,
                         user_text=user_text,
-                        api_key=api_key,
+                        google_api_key=google_api_key,
                     )
                 except Exception as eval_err:
                     st.error(f"Inference Engine Error: {eval_err}")
