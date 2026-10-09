@@ -272,7 +272,7 @@ def check_news_hub(user_title, user_text, news_api_key):
         "language": "en",
         "sortBy": "relevance",
         "pageSize": 3,
-        "apiKey": news_api_key
+        "apiKey": news_api_key,
     }
 
     try:
