@@ -474,132 +474,143 @@ st.markdown(
 # ---------------------------------------------------------
 # 7. MAIN INTERFACE LAYOUT
 # ---------------------------------------------------------
-col_input, col_output = st.columns([1.1, 0.9], gap="large")
+# ---------------------------------------------------------
+# MAIN INTERFACE WITH TABS INTEGRATION
+# ---------------------------------------------------------
+tab_app, tab_docs = st.tabs(["⚡ Verification Engine", "📖 Model Card & Specs"])
 
-with col_input:
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.subheader("📄 Input Article Analysis")
+with tab_app:
+    col_input, col_output = st.columns([1.1, 0.9], gap="large")
 
-    user_title = st.text_input(
-        "Article Title:",
-        placeholder="e.g., Breaking News: Major Event Announced...",
-    )
-    user_text = st.text_area(
-        "Article Body Text:",
-        height=240,
-        placeholder="Paste article body text here...",
-    )
+    with col_input:
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        st.subheader("📄 Input Article Analysis")
 
-    analyze_btn = st.button("⚡ Run Verification Engine")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with col_output:
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.subheader("📊 Verification Report")
-
-    if analyze_btn:
-        if not user_text.strip() and not user_title.strip():
-            st.warning(
-                "Please provide an article title or body text to evaluate."
-            )
-        elif not weights_loaded:
-            st.error(
-                "Cannot run prediction: Essential model weights or components failed to load on startup. "
-                "Check the top banner error for details."
-            )
-        else:
-            with st.spinner(
-                "Running NLP models (DistilBERT & Emotion) and querying external databases..."
-            ):
-                google_api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
-                news_api_key = st.secrets.get("NEWS_HUB_API_KEY", None)
-                
-                try:
-                    st.session_state.results = predict_article(
-                        user_title=user_title,
-                        user_text=user_text,
-                        google_api_key=google_api_key,
-                        news_api_key=news_api_key,
-                    )
-                except Exception as eval_err:
-                    st.error(f"Inference Engine Error: {eval_err}")
-
-    if st.session_state.results is not None:
-        res = st.session_state.results
-
-        # Metric Visualization Output
-        if res.get("confidence_level") == "Moderate":
-            st.warning("⚠️ **Moderate Confidence Signal (Borderline Case)**")
-            st.progress(float(res["probability"]))
-            st.info(
-                f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
-                "Because this falls in the neutral zone (42%–58%), the text contains mixed stylistic signals. "
-                "Cross-referencing with official news outlets or trusted databases is recommended."
-            )
-        elif res["prediction"] == 1:
-            st.success("### ✅ VERIFIED: Likely Authentic News")
-            st.progress(float(res["probability"]))
-            st.write(
-                f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating"
-            )
-        else:
-            st.error("### ⚠️ FLAG: Likely Misinformation")
-            st.progress(float(1 - res["probability"]))
-            st.write(
-                f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability"
-            )
-
-        # Fact-Check Database Override Banner
-        if res.get("override_applied"):
-            st.info(
-                "ℹ️ Output overridden by explicit match in external Fact-Check or News Hub database."
-            )
-
-        st.divider()
-
-        # 👈 ADDED: News Hub Verification Display Card
-        st.markdown("**Live Media Index Cross-Reference:**")
-        if res.get("news_found") == 1:
-            st.success(
-                f"🗞️ **Verified Publication Found!**\n\n"
-                f"Published on **{res['publisher_name']}** "
-                f"([View Original Source]({res['article_url']}))"
-            )
-        else:
-            st.warning("No live news index match found on GNews API.")
-
-        # Verification Status
-        st.markdown("**Fact-Check Registry Status:**")
-        if res["fact_flag"] == 1:
-            st.success(
-                f"Fact Match Found! Official Rating: '{res['api_rating']}'"
-            )
-        else:
-            st.info("No direct match in Google Fact Check registry (Standard for news that hasn't been flagged or debunked).")
-
-        st.divider()
-
-        # Detected NLP Metrics
-        st.markdown("**Automated Transformer Feature Extraction:**")
-        ncol1, ncol2 = st.columns(2)
-        ncol1.info(f"**Sentiment:** {res['sentiment'].capitalize()}")
-        ncol2.info(f"**Dominant Emotion:** {res['emotion'].capitalize()}")
-
-        # Structural Metadata
-        st.markdown("**Structural Article Metadata:**")
-        mcol1, mcol2, mcol3 = st.columns(3)
-        mcol1.metric("Word Count", f"{res['word_count']}")
-        mcol2.metric("Char Count", f"{res['char_count']}")
-        mcol3.metric("Avg Word Length", f"{res['avg_word_len']:.2f}")
-
-    else:
-        st.info(
-            "Paste an article on the left and click **Run Verification Engine** to generate an assessment."
+        user_title = st.text_input(
+            "Article Title (Highly Recommended):",
+            placeholder="e.g., Breaking News: Major Event Announced...",
+            help="Providing an explicit article headline significantly enhances feature vector density and model prediction accuracy.",
+        )
+        user_text = st.text_area(
+            "Article Body Text:",
+            height=240,
+            placeholder="Paste article body text here...",
         )
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        analyze_btn = st.button("⚡ Run Verification Engine")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# --------------
+    with col_output:
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        st.subheader("📊 Verification Report")
+
+        if analyze_btn:
+            if not user_text.strip() and not user_title.strip():
+                st.warning(
+                    "Please provide an article title or body text to evaluate."
+                )
+            elif not weights_loaded:
+                st.error(
+                    "Cannot run prediction: Essential model weights or components failed to load on startup. "
+                    "Check the top banner error for details."
+                )
+            else:
+                with st.spinner(
+                    "Running NLP models (DistilBERT & Emotion) and querying external databases..."
+                ):
+                    google_api_key = st.secrets.get(
+                        "GOOGLE_FACTCHECK_API_KEY", None
+                    )
+                    news_api_key = st.secrets.get("NEWS_HUB_API_KEY", None)
+
+                    try:
+                        st.session_state.results = predict_article(
+                            user_title=user_title,
+                            user_text=user_text,
+                            google_api_key=google_api_key,
+                            news_api_key=news_api_key,
+                        )
+                    except Exception as eval_err:
+                        st.error(f"Inference Engine Error: {eval_err}")
+
+        if st.session_state.results is not None:
+            res = st.session_state.results
+
+            # Metric Visualization Output
+            if res.get("confidence_level") == "Moderate":
+                st.warning("⚠️ **Moderate Confidence Signal (Borderline Case)**")
+                st.progress(float(res["probability"]))
+                st.info(
+                    f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
+                    "Because this falls in the neutral zone (42%–58%), the text contains mixed stylistic signals. "
+                    "Cross-referencing with official news outlets or trusted databases is recommended."
+                )
+            elif res["prediction"] == 1:
+                st.success("### ✅ VERIFIED: Likely Authentic News")
+                st.progress(float(res["probability"]))
+                st.write(
+                    f"**Credibility Score:** `{res['probability'] * 100:.2f}%` Credibility Rating"
+                )
+            else:
+                st.error("### ⚠️ FLAG: Likely Misinformation")
+                st.progress(float(1 - res["probability"]))
+                st.write(
+                    f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability"
+                )
+
+            # Fact-Check Database Override Banner
+            if res.get("override_applied"):
+                st.info(
+                    "ℹ️ Output overridden by explicit match in external Fact-Check or News Hub database."
+                )
+
+            st.divider()
+
+            # Live Media Index Cross-Reference
+            st.markdown("**Live Media Index Cross-Reference:**")
+            if res.get("news_found") == 1:
+                st.success(
+                    f"🗞️ **Verified Publication Found!**\n\n"
+                    f"Published on **{res['publisher_name']}** "
+                    f"([View Original Source]({res['article_url']}))"
+                )
+            else:
+                st.warning("No live news index match found on GNews API.")
+
+            # Fact-Check Registry Status
+            st.markdown("**Fact-Check Registry Status:**")
+            if res["fact_flag"] == 1:
+                st.success(
+                    f"Fact Match Found! Official Rating: '{res['api_rating']}'"
+                )
+            else:
+                st.info(
+                    "No direct match in Google Fact Check registry (Standard for news that hasn't been flagged or debunked)."
+                )
+
+            st.divider()
+
+            # Detected NLP Metrics
+            st.markdown("**Automated Transformer Feature Extraction:**")
+            ncol1, ncol2 = st.columns(2)
+            ncol1.info(f"**Sentiment:** {res['sentiment'].capitalize()}")
+            ncol2.info(f"**Dominant Emotion:** {res['emotion'].capitalize()}")
+
+            # Structural Metadata
+            st.markdown("**Structural Article Metadata:**")
+            mcol1, mcol2, mcol3 = st.columns(3)
+            mcol1.metric("Word Count", f"{res['word_count']}")
+            mcol2.metric("Char Count", f"{res['char_count']}")
+            mcol3.metric("Avg Word Length", f"{res['avg_word_len']:.2f}")
+
+        else:
+            st.info(
+                "Paste an article on the left and click **Run Verification Engine** to generate an assessment."
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 with tab_docs:
     st.markdown("""
     ## 📖 Veritas AI — System Model Card & Architecture
@@ -616,8 +627,8 @@ with tab_docs:
     4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
     
     ### 3. Known Limitations & Failure Modes
-    * **Free-Tier API Latency:** GNews free indexing enforces a 12-hour delay on breaking coverage. Breaking stories published within 12 hours fall back to statistical classification. Also they model is limited in it's reach to publications it can fall on for news verification
+    * **Free-Tier API Latency & Scope:** GNews free indexing enforces a 12-hour delay on breaking coverage, and its media reach is constrained to its indexed free-tier publishers.
     * **Unindexed Reporting:** Google Fact Check API indexes debunked claims, not standard mainstream reporting. Authentic articles naturally show *"No direct match in registry."*
     * **Sensational Language Sensitivities:** Legitimate news articles covering emotionally intense events (e.g., crime, court cases) may trigger higher statistical risk scores due to stylistic vocabulary overlap with sensational fake news.
-    * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction. Evaluating an article body without an explicit headline reduces the feature space density, which can lower probabilistic accuracy or cause borderline confidence scores. 
+    * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction. Evaluating an article body without an explicit headline reduces feature space density, which can lower probabilistic accuracy or cause borderline confidence scores.
     """)
