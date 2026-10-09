@@ -220,9 +220,9 @@ if not weights_loaded:
 # ---------------------------------------------------------
 # 3. EXTERNAL FACT-CHECKING API FUNCTION
 # ---------------------------------------------------------
-def check_google_factcheck(user_title, user_text, api_key):
+def check_google_factcheck(user_title, user_text, google_api_key):
     """Fallback search using title first, then first sentence of body."""
-    if not api_key or api_key == "YOUR_GOOGLE_API_KEY_HERE":
+    if not google_api_key or google_api_key == "YOUR_GOOGLE_API_KEY_HERE":
         return 0, None
 
     # Determine query string: prefer title, fallback to first 100 chars of body
@@ -234,7 +234,7 @@ def check_google_factcheck(user_title, user_text, api_key):
     params = {
         "query": query_str[:100],
         "languageCode": "en",
-        "key": api_key,
+        "key": google_api_key,
     }
 
     try:
@@ -295,7 +295,7 @@ def check_news_hub(user_title, user_text, news_api_key):
 # ---------------------------------------------------------
 # 4. INFERENCE ENGINE WITH OVERRIDE LOGIC
 # ---------------------------------------------------------
-def predict_article(user_title, user_text, api_key, news_api_key=None):
+def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
     # Step A: Dynamic NLP Inference
