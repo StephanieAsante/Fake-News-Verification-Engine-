@@ -455,7 +455,7 @@ with st.sidebar:
     - **Accuracy:** 98.97%
     - **Recall (Fake News):** 99.33%
     - **Precision:** 98.67%
-    - **ROC-AUC:** 0.9982
+    - **ROC-AUC:** 0.9896
     """)
     st.divider()
     st.caption("Powered by Scikit-Learn, PyTorch & Streamlit")
@@ -481,7 +481,7 @@ with col_input:
     st.subheader("📄 Input Article Analysis")
 
     user_title = st.text_input(
-        "Article Title (Optional):",
+        "Article Title:",
         placeholder="e.g., Breaking News: Major Event Announced...",
     )
     user_text = st.text_area(
@@ -598,3 +598,26 @@ with col_output:
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
+
+# --------------
+with tab_docs:
+    st.markdown("""
+    ## 📖 Veritas AI — System Model Card & Architecture
+    
+    ### 1. Intended Use & Target Scope
+    * **Purpose:** Automated misinformation risk detection and media cross-referencing prototype.
+    * **Intended Input:** English news articles, headlines, and written journalistic content.
+    * **Out-of-Scope:** Satire, raw transcripts without context, non-English text, and real-time social media posts.
+    
+    ### 2. Multi-Tier Architecture
+    1. **Live Fact-Check Lookup:** Queries Google Fact Check API for debunked claims.
+    2. **Live Media Cross-Reference:** Queries GNews API to verify publication on tier-1 news outlets.
+    3. **Transformer Feature Extraction:** Uses `DistilBERT` (Sentiment) and `DistilRoBERTa` (Emotion Analysis).
+    4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
+    
+    ### 3. Known Limitations & Failure Modes
+    * **Free-Tier API Latency:** GNews free indexing enforces a 12-hour delay on breaking coverage. Breaking stories published within 12 hours fall back to statistical classification. Also they model is limited in it's reach to publications it can fall on for news verification
+    * **Unindexed Reporting:** Google Fact Check API indexes debunked claims, not standard mainstream reporting. Authentic articles naturally show *"No direct match in registry."*
+    * **Sensational Language Sensitivities:** Legitimate news articles covering emotionally intense events (e.g., crime, court cases) may trigger higher statistical risk scores due to stylistic vocabulary overlap with sensational fake news.
+    * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction. Evaluating an article body without an explicit headline reduces the feature space density, which can lower probabilistic accuracy or cause borderline confidence scores. 
+    """)
