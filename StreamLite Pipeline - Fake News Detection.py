@@ -266,12 +266,11 @@ def check_news_hub(user_title, user_text, news_api_key):
     if not query_str:
         return 0, None, None
 
-    url = "https://newsapi.org/v2/everything"
+    url = "https://gnews.io/api/v4/search"
     params = {
         "q": query_str[:80], # Removed exact quote wrappers for flexible keyword matching
-        "language": "en",
-        "sortBy": "relevance",
-        "pageSize": 3,
+        "lang": "en",
+        "max":3,
         "apiKey": news_api_key,
     }
 
@@ -287,8 +286,8 @@ def check_news_hub(user_title, user_text, news_api_key):
                 publisher = top_article.get("source", {}).get("name", "Trusted Publisher")
                 article_url = top_article.get("url", "")
                 return 1, publisher, article_url
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"GNews API Request Error:{e}")
 
     return 0, None, None
 
