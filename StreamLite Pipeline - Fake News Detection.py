@@ -268,7 +268,7 @@ def check_news_hub(user_title, user_text, news_api_key):
 
     url = "https://newsapi.org/v2/everything"
     params = {
-        "q": f'"{query_str[:80]}"', # Exact title match query
+        "q": query_str[:80], # Removed exact quote wrappers for flexible keyword matching
         "language": "en",
         "sortBy": "relevance",
         "pageSize": 3,
@@ -401,15 +401,15 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
             final_prob = 0.95
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
-            
-            # 2. PRIORITY 2: News Hub Match (Prevents False Positives on Real News)
+
+    # 2. PRIORITY 2: News Hub Match (Fixed Indentation)
     elif news_found == 1:
         final_prediction = 1  # Confirmed Verified / Authentic
         final_prob = max(raw_prob, 0.92)  # Set high credibility floor
         override_applied = True
         confidence_level = f"High (Verified Source: {publisher_name})"
 
-    # 3. PRIORITY 3: Model Probability Confidence Evaluation (No Overrides Triggered)
+    # 3. PRIORITY 3: Model Probability Confidence Evaluation
     if not override_applied:
         if 0.42 <= final_prob <= 0.58:
             confidence_level = "Moderate"
@@ -523,6 +523,7 @@ with col_output:
                         user_title=user_title,
                         user_text=user_text,
                         google_api_key=google_api_key,
+                        news_api_key = news_api_key,
                     )
                 except Exception as eval_err:
                     st.error(f"Inference Engine Error: {eval_err}")
