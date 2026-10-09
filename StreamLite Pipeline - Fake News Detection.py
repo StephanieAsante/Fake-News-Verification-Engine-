@@ -254,6 +254,43 @@ def check_google_factcheck(user_title, user_text, api_key):
 
     return 0, None
 
+def check_news_hub(user_title, user_text, news_api_key):
+    """
+    Queries NewsAPI to verify if the article exists on reputable media outlets.
+    """
+    if not news_api_key:
+        return 0, None, None
+
+    # Construct search query from title (or first sentence of body)
+    query_str = user_title.strip() if user_title.strip() else user_text.strip()[:100]
+    if not query_str:
+        return 0, None, None
+
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": f'"{query_str[:80]}"', # Exact title match query
+        "language": "en",
+        "sortBy": "relevance",
+        "pageSize": 3,
+        "apiKey": news_api_key
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            articles = data.get("articles", [])
+            
+            if articles:
+                # Extract primary publisher and title match
+                top_article = articles[0]
+                publisher = top_article.get("source", {}).get("name", "Trusted Publisher")
+                article_url = top_article.get("url", "")
+                return 1, publisher, article_url
+    except Exception:
+        pass
+
+    return 0, None, None
 
 # ---------------------------------------------------------
 # 4. INFERENCE ENGINE WITH OVERRIDE LOGIC
@@ -275,9 +312,8 @@ def predict_article(user_title, user_text, api_key):
         emotion_res = "Neutral"
 
     # Step B: Live API Lookup
-    fact_flag, api_rating = check_google_factcheck(
-        user_title, user_text, api_key
-    )
+    fact_flag, api_rating = check_google_factcheck(user_title, user_text, google_api_key)
+    news_found, publisher_name, article_url = check_news_hub(user_title, user_text, news_api_key)
 
     # Step C: Metadata Calculations & Capping Bounds
     TRAIN_MAX_CHAR = 32655
@@ -333,28 +369,47 @@ def predict_article(user_title, user_text, api_key):
     # Step E: Model Statistical Prediction
     raw_pred = fake_news_model.predict(X_final)[0]
     raw_prob = fake_news_model.predict_proba(X_final)[0][1]  # Prob of Class 1 (Real)
-
-    # Step F: Fact-Check Database Rule Override & Confidence Classification
+    
+    #Step F: Database Overrides & Statistical Confidence Classification
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
     confidence_level = "High"
 
-    # Check for live API overrides first
+    # 1. PRIORITY 1: Google Fact Check Database Match
     if fact_flag == 1 and api_rating:
         rating_lower = api_rating.lower()
-        if any(term in rating_lower for term in ["false", "fake", "incorrect", "misleading", "pants on fire"]):
-            final_prediction = 0
+        if any(
+            term in rating_lower
+            for term in [
+                "false",
+                "fake",
+                "incorrect",
+                "misleading",
+                "pants on fire",
+            ]
+        ):
+            final_prediction = 0  # Misinformation / Fake
             final_prob = 0.05
             override_applied = True
-            confidence_level = "High (Database Override)"
-        elif any(term in rating_lower for term in ["true", "accurate", "correct", "verified"]):
-            final_prediction = 1
+            confidence_level = "High (Fact-Check Override)"
+        elif any(
+            term in rating_lower
+            for term in ["true", "accurate", "correct", "verified"]
+        ):
+            final_prediction = 1  # Verified / Real
             final_prob = 0.95
             override_applied = True
-            confidence_level = "High (Database Override)"
+            confidence_level = "High (Fact-Check Override)"
+            
+            # 2. PRIORITY 2: News Hub Match (Prevents False Positives on Real News)
+    elif news_found == 1:
+        final_prediction = 1  # Confirmed Verified / Authentic
+        final_prob = max(raw_prob, 0.92)  # Set high credibility floor
+        override_applied = True
+        confidence_level = f"High (Verified Source: {publisher_name})"
 
-    # If no database override occurred, evaluate model probability confidence
+    # 3. PRIORITY 3: Model Probability Confidence Evaluation (No Overrides Triggered)
     if not override_applied:
         if 0.42 <= final_prob <= 0.58:
             confidence_level = "Moderate"
@@ -369,11 +424,18 @@ def predict_article(user_title, user_text, api_key):
         "emotion": emotion_res,
         "fact_flag": fact_flag,
         "api_rating": api_rating,
+        "news_found": news_found if "news_found" in locals() else 0,
+        "publisher_name": (
+            publisher_name if "publisher_name" in locals() else None
+        ),
+        "article_url": article_url if "article_url" in locals() else None,
         "override_applied": override_applied,
         "char_count": raw_char_count,
         "word_count": raw_word_count,
-        "avg_word_len": raw_avg_word_len
+        "avg_word_len": raw_avg_word_len,
     }
+
+
 # ---------------------------------------------------------
 # 5. SIDEBAR ARCHITECTURE & BENCHMARKS
 # ---------------------------------------------------------
