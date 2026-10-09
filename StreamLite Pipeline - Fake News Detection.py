@@ -295,7 +295,7 @@ def check_news_hub(user_title, user_text, news_api_key):
 # ---------------------------------------------------------
 # 4. INFERENCE ENGINE WITH OVERRIDE LOGIC
 # ---------------------------------------------------------
-def predict_article(user_title, user_text, api_key):
+def predict_article(user_title, user_text, api_key, news_api_key=None):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
     # Step A: Dynamic NLP Inference
@@ -515,6 +515,7 @@ with col_output:
                 "Running NLP models (DistilBERT & Emotion) and querying external databases..."
             ):
                 api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
+                news_api_key = st.secrets.get("NEWS_HUB_API_KEY", None)
                 try:
                     st.session_state.results = predict_article(
                         user_title=user_title,
