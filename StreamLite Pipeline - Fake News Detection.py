@@ -514,8 +514,10 @@ with col_output:
             with st.spinner(
                 "Running NLP models (DistilBERT & Emotion) and querying external databases..."
             ):
-                api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
+                # Ensure the variable name is defined as google_api_key
+                google_api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
                 news_api_key = st.secrets.get("NEWS_HUB_API_KEY", None)
+                
                 try:
                     st.session_state.results = predict_article(
                         user_title=user_title,
