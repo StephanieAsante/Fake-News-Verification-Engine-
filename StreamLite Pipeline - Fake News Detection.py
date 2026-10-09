@@ -225,7 +225,6 @@ def check_google_factcheck(user_title, user_text, google_api_key):
     if not google_api_key or google_api_key == "YOUR_GOOGLE_API_KEY_HERE":
         return 0, None
 
-    # Determine query string: prefer title, fallback to first 100 chars of body
     query_str = user_title.strip() if user_title.strip() else user_text.strip()[:100]
     if not query_str:
         return 0, None
@@ -256,22 +255,21 @@ def check_google_factcheck(user_title, user_text, google_api_key):
 
 def check_news_hub(user_title, user_text, news_api_key):
     """
-    Queries NewsAPI to verify if the article exists on reputable media outlets.
+    Queries GNews API to verify if the article exists on reputable media outlets.
     """
     if not news_api_key:
         return 0, None, None
 
-    # Construct search query from title (or first sentence of body)
     query_str = user_title.strip() if user_title.strip() else user_text.strip()[:100]
     if not query_str:
         return 0, None, None
 
     url = "https://gnews.io/api/v4/search"
     params = {
-        "q": query_str[:80], # Removed exact quote wrappers for flexible keyword matching
+        "q": query_str[:80],
         "lang": "en",
-        "max":3,
-        "apiKey": news_api_key,
+        "max": 3,
+        "token": news_api_key,  # 👈 FIXED: Changed 'apiKey' to 'token' for GNews API
     }
 
     try:
@@ -281,13 +279,12 @@ def check_news_hub(user_title, user_text, news_api_key):
             articles = data.get("articles", [])
             
             if articles:
-                # Extract primary publisher and title match
                 top_article = articles[0]
-                publisher = top_article.get("source", {}).get("name", "Trusted Publisher")
+                publisher = top_article.get("source", {}).get("name", "Verified Publisher")
                 article_url = top_article.get("url", "")
                 return 1, publisher, article_url
     except Exception as e:
-        print(f"GNews API Request Error:{e}")
+        print(f"GNews API Request Error: {e}")
 
     return 0, None, None
 
@@ -405,10 +402,10 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
 
-    # 2. PRIORITY 2: News Hub Match (Fixed Alignment)
+    # 2. PRIORITY 2: News Hub Match (Prevents False Positives)
     elif news_found == 1:
         final_prediction = 1  # Confirmed Verified / Authentic
-        final_prob = max(raw_prob, 0.92)  # Set high credibility floor
+        final_prob = max(raw_prob, 0.95)  # Set high credibility floor
         override_applied = True
         confidence_level = f"High (Verified Source: {publisher_name})"
 
@@ -427,11 +424,9 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
         "emotion": emotion_res,
         "fact_flag": fact_flag,
         "api_rating": api_rating,
-        "news_found": news_found if "news_found" in locals() else 0,
-        "publisher_name": (
-            publisher_name if "publisher_name" in locals() else None
-        ),
-        "article_url": article_url if "article_url" in locals() else None,
+        "news_found": news_found,
+        "publisher_name": publisher_name,
+        "article_url": article_url,
         "override_applied": override_applied,
         "char_count": raw_char_count,
         "word_count": raw_word_count,
@@ -516,7 +511,6 @@ with col_output:
             with st.spinner(
                 "Running NLP models (DistilBERT & Emotion) and querying external databases..."
             ):
-                # Ensure the variable name is defined as google_api_key
                 google_api_key = st.secrets.get("GOOGLE_FACTCHECK_API_KEY", None)
                 news_api_key = st.secrets.get("NEWS_HUB_API_KEY", None)
                 
@@ -525,7 +519,7 @@ with col_output:
                         user_title=user_title,
                         user_text=user_text,
                         google_api_key=google_api_key,
-                        news_api_key = news_api_key,
+                        news_api_key=news_api_key,
                     )
                 except Exception as eval_err:
                     st.error(f"Inference Engine Error: {eval_err}")
@@ -558,16 +552,21 @@ with col_output:
         # Fact-Check Database Override Banner
         if res.get("override_applied"):
             st.info(
-                "ℹ️ Output overridden by explicit match in external Fact-Check database."
+                "ℹ️ Output overridden by explicit match in external Fact-Check or News Hub database."
             )
 
         st.divider()
 
-        # Detected NLP Metrics
-        st.markdown("**Automated Transformer Feature Extraction:**")
-        ncol1, ncol2 = st.columns(2)
-        ncol1.info(f"**Sentiment:** {res['sentiment'].capitalize()}")
-        ncol2.info(f"**Dominant Emotion:** {res['emotion'].capitalize()}")
+        # 👈 ADDED: News Hub Verification Display Card
+        st.markdown("**Live Media Index Cross-Reference:**")
+        if res.get("news_found") == 1:
+            st.success(
+                f"🗞️ **Verified Publication Found!**\n\n"
+                f"Published on **{res['publisher_name']}** "
+                f"([View Original Source]({res['article_url']}))"
+            )
+        else:
+            st.warning("No live news index match found on GNews API.")
 
         # Verification Status
         st.markdown("**Fact-Check Registry Status:**")
@@ -576,7 +575,15 @@ with col_output:
                 f"Fact Match Found! Official Rating: '{res['api_rating']}'"
             )
         else:
-            st.warning("No direct match in Google Fact Check registry.")
+            st.info("No direct match in Google Fact Check registry (Standard for news that hasn't been flagged or debunked).")
+
+        st.divider()
+
+        # Detected NLP Metrics
+        st.markdown("**Automated Transformer Feature Extraction:**")
+        ncol1, ncol2 = st.columns(2)
+        ncol1.info(f"**Sentiment:** {res['sentiment'].capitalize()}")
+        ncol2.info(f"**Dominant Emotion:** {res['emotion'].capitalize()}")
 
         # Structural Metadata
         st.markdown("**Structural Article Metadata:**")
