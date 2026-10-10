@@ -564,7 +564,8 @@ with tab_app:
                 )
             else:
                 st.info(
-                    "No direct match in GDELT historical archive."
+                    "No direct match in GDELT historical archive. (Note: The GDELT archive connection verifies published news and media coverage dating back up to 90 days).
+                    "Evaluation has been smoothly handed over to the core probabilistic machine learning model.")
                 )
 
             # Fact-Check Registry Status
