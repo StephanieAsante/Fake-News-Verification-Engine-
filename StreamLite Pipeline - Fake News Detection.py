@@ -382,7 +382,7 @@ with tab_app:
                 st.error(f"### ⚠️ FLAG: Likely Misinformation ({(1-res['probability'])*100:.2f}%)")
 
             if res.get("news_found") == 1:
-                st.success(f"🌍 **Tier 1 Match (GDELT Archive):** {res['publisher_name']} ([View Source]({res['article_url']))")
+                st.success(f"🌍 **Tier 1 Match (GDELT Archive):** {res['publisher_name']} ([View Source]({res['article_url']}))")
             elif res["fact_flag"] == 1:
                 st.success(f"🔍 **Tier 2 Match (Fact-Check Registry):** Official Rating: '{res['api_rating']}'")
             else:
