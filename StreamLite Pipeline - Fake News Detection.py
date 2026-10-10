@@ -218,7 +218,7 @@ if not weights_loaded:
     )
 
 # ---------------------------------------------------------
-# 3. EXTERNAL FACT-CHECKING API FUNCTION
+# 3. EXTERNAL FACT-CHECKING & FLEXIBLE NEWS HUB APIs
 # ---------------------------------------------------------
 def check_google_factcheck(user_title, user_text, google_api_key):
     """Fallback search using title first, then first sentence of body."""
@@ -255,18 +255,32 @@ def check_google_factcheck(user_title, user_text, google_api_key):
 
 def check_news_hub(user_title, user_text, news_api_key):
     """
-    Queries GNews API to verify if the article exists on reputable media outlets.
+    Queries GNews API using flexible keyword extraction to maximize match rates.
     """
     if not news_api_key:
         return 0, None, None
 
-    query_str = user_title.strip() if user_title.strip() else user_text.strip()[:100]
-    if not query_str:
+    # Combine title and text snippet for keyword parsing
+    raw_str = f"{user_title} {user_text[:200]}".strip()
+    if not raw_str:
         return 0, None, None
+
+    # Filter out common stop words to build a flexible keyword query string
+    stop_words = {
+        "the", "a", "an", "in", "on", "at", "by", "for", "with", "and", 
+        "or", "but", "to", "of", "is", "are", "was", "were", "it", "that", 
+        "this", "told", "said", "from", "as", "he", "she", "they", "its"
+    }
+    words = [w for w in raw_str.split() if w.lower() not in stop_words and len(w) > 2]
+    
+    # Take top 5 core keywords for flexible matching
+    flexible_query = " ".join(words[:5])
+    if not flexible_query:
+        flexible_query = raw_str[:50]
 
     url = "https://gnews.io/api/v4/search"
     params = {
-        "q": query_str[:80],
+        "q": flexible_query,
         "lang": "en",
         "max": 3,
         "token": news_api_key,
@@ -401,11 +415,8 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
 
     # 3. PRIORITY 3: Balanced Soft Thresholding for API Misses / Older Articles
     if not override_applied:
-        # Widen the neutral/moderate zone (38% to 62%) to prevent false positives on real news
         if 0.38 <= final_prob <= 0.62:
             confidence_level = "Moderate"
-            # If statistical model is slightly hesitant on real/borderline content, 
-            # prevent forcing a hard false flag if probability is near 50%.
             if final_prob >= 0.45:
                 final_prediction = 1 
         else:
@@ -569,7 +580,7 @@ with tab_app:
             else:
                 st.warning(
                     "No live news index match found on GNews API. "
-                    "(Note: GNews Free Tier enforces a 30-day historical window and 12-hour breaking delay; older or archived articles will not match here)."
+                    "(Note: GNews Free Tier enforces a 30-day historical window and 12-hour breaking delay)."
                 )
 
             # Fact-Check Registry Status
@@ -617,7 +628,7 @@ with tab_docs:
     
     ### 2. Multi-Tier Architecture
     1. **Live Fact-Check Lookup:** Queries Google Fact Check API for debunked claims.
-    2. **Live Media Cross-Reference:** Queries GNews API to verify publication on tier-1 news outlets.
+    2. **Live Media Cross-Reference:** Queries GNews API using flexible keyword extraction to verify publication on tier-1 news outlets.
     3. **Transformer Feature Extraction:** Uses `DistilBERT` (Sentiment) and `DistilRoBERTa` (Emotion Analysis).
     4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
     
