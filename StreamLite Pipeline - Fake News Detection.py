@@ -269,7 +269,7 @@ def check_news_hub(user_title, user_text, news_api_key):
         "q": query_str[:80],
         "lang": "en",
         "max": 3,
-        "token": news_api_key,  # 👈 FIXED: Changed 'apiKey' to 'token' for GNews API
+        "token": news_api_key,
     }
 
     try:
@@ -289,7 +289,7 @@ def check_news_hub(user_title, user_text, news_api_key):
     return 0, None, None
 
 # ---------------------------------------------------------
-# 4. INFERENCE ENGINE WITH OVERRIDE LOGIC
+# 4. INFERENCE ENGINE WITH OVERRIDE LOGIC & BALANCED THRESHOLDS
 # ---------------------------------------------------------
 def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     fully_combined_article = f"{user_title} {user_text}".strip()
@@ -320,23 +320,19 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     TRAIN_MAX_WORD = 5412
     TRAIN_MAX_AVG_WORD_LEN = 74.0
 
-    # 1. Define raw counts (Used for final return display)
     raw_char_count = len(fully_combined_article)
     raw_word_count = len(fully_combined_article.split())
     raw_avg_word_len = (
         raw_char_count / raw_word_count if raw_word_count > 0 else 0.0
     )
 
-    # 2. Define capped counts (Passed to StandardScaler)
     capped_char_count = min(raw_char_count, TRAIN_MAX_CHAR)
     capped_word_count = min(raw_word_count, TRAIN_MAX_WORD)
     capped_avg_word_len = min(raw_avg_word_len, TRAIN_MAX_AVG_WORD_LEN)
 
     # Step D: Feature Transformations
-    # 1. TF-IDF
     X_tfidf = tfidf_weights.transform([fully_combined_article])
 
-    # 2. Numerical Features
     num_raw = [[capped_char_count, capped_word_count, capped_avg_word_len]]
     if hasattr(scaler_weights, "feature_names_in_"):
         num_df = pd.DataFrame(
@@ -346,7 +342,6 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     else:
         X_num = scaler_weights.transform(np.array(num_raw))
 
-    # 3. Categorical Features (One-Hot Encoded)
     cat_raw = [[sentiment_res, emotion_res]]
     if hasattr(onehot_weights, "feature_names_in_"):
         cat_df = pd.DataFrame(
@@ -356,13 +351,8 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     else:
         X_cat = onehot_weights.transform(np.array(cat_raw))
 
-    # 4. Fact Flag
     X_fact = np.array([[fact_flag]])
 
-    # ---------------------------------------------------------
-    # MATCHING TRAINING SEQUENCE:
-    # hstack([TFIDF, NUMERICAL, CATEGORICAL, FACT_FLAG])
-    # ---------------------------------------------------------
     X_meta = np.hstack([X_num, X_cat, X_fact])
     X_final = hstack([X_tfidf, X_meta])
 
@@ -370,7 +360,7 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     raw_pred = fake_news_model.predict(X_final)[0]
     raw_prob = fake_news_model.predict_proba(X_final)[0][1]  # Prob of Class 1 (Real)
 
-    # Step F: Database Overrides & Statistical Confidence Classification
+    # Step F: Database Overrides & Balanced Neutral Band Logic
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
@@ -389,7 +379,7 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
                 "pants on fire",
             ]
         ):
-            final_prediction = 0  # Misinformation / Fake
+            final_prediction = 0
             final_prob = 0.05
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
@@ -397,22 +387,27 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None):
             term in rating_lower
             for term in ["true", "accurate", "correct", "verified"]
         ):
-            final_prediction = 1  # Verified / Real
+            final_prediction = 1
             final_prob = 0.95
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
 
-    # 2. PRIORITY 2: News Hub Match (Prevents False Positives)
+    # 2. PRIORITY 2: News Hub Match
     elif news_found == 1:
-        final_prediction = 1  # Confirmed Verified / Authentic
-        final_prob = max(raw_prob, 0.95)  # Set high credibility floor
+        final_prediction = 1
+        final_prob = max(raw_prob, 0.95)
         override_applied = True
         confidence_level = f"High (Verified Source: {publisher_name})"
 
-    # 3. PRIORITY 3: Model Probability Confidence Evaluation
+    # 3. PRIORITY 3: Balanced Soft Thresholding for API Misses / Older Articles
     if not override_applied:
-        if 0.42 <= final_prob <= 0.58:
+        # Widen the neutral/moderate zone (38% to 62%) to prevent false positives on real news
+        if 0.38 <= final_prob <= 0.62:
             confidence_level = "Moderate"
+            # If statistical model is slightly hesitant on real/borderline content, 
+            # prevent forcing a hard false flag if probability is near 50%.
+            if final_prob >= 0.45:
+                final_prediction = 1 
         else:
             confidence_level = "High"
 
@@ -473,9 +468,6 @@ st.markdown(
 
 # ---------------------------------------------------------
 # 7. MAIN INTERFACE LAYOUT
-# ---------------------------------------------------------
-# ---------------------------------------------------------
-# MAIN INTERFACE WITH TABS INTEGRATION
 # ---------------------------------------------------------
 tab_app, tab_docs = st.tabs(["⚡ Verification Engine", "📖 Model Card & Specs"])
 
@@ -538,12 +530,12 @@ with tab_app:
 
             # Metric Visualization Output
             if res.get("confidence_level") == "Moderate":
-                st.warning("⚠️ **Moderate Confidence Signal (Borderline Case)**")
+                st.warning("⚠️ **Moderate Confidence Signal (Borderline / Mixed Case)**")
                 st.progress(float(res["probability"]))
                 st.info(
                     f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
-                    "Because this falls in the neutral zone (42%–58%), the text contains mixed stylistic signals. "
-                    "Cross-referencing with official news outlets or trusted databases is recommended."
+                    "Because this falls in the neutral zone, stylistic elements resemble mixed linguistic signals. "
+                    "Cross-referencing with official news outlets is recommended."
                 )
             elif res["prediction"] == 1:
                 st.success("### ✅ VERIFIED: Likely Authentic News")
@@ -575,7 +567,10 @@ with tab_app:
                     f"([View Original Source]({res['article_url']}))"
                 )
             else:
-                st.warning("No live news index match found on GNews API.")
+                st.warning(
+                    "No live news index match found on GNews API. "
+                    "(Note: GNews Free Tier enforces a 30-day historical window and 12-hour breaking delay; older or archived articles will not match here)."
+                )
 
             # Fact-Check Registry Status
             st.markdown("**Fact-Check Registry Status:**")
@@ -627,7 +622,7 @@ with tab_docs:
     4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
     
     ### 3. Known Limitations & Failure Modes
-    * **Free-Tier API Latency & Scope:** GNews free indexing enforces a 12-hour delay on breaking coverage, and its media reach is constrained to its indexed free-tier publishers.
+    * **Free-Tier API Historical Limit:** GNews free-tier limits historical archive access to the last 30 days. Articles published weeks or months ago will not return live news matches via API lookup and will rely on statistical text analysis.
     * **Unindexed Reporting:** Google Fact Check API indexes debunked claims, not standard mainstream reporting. Authentic articles naturally show *"No direct match in registry."*
     * **Sensational Language Sensitivities:** Legitimate news articles covering emotionally intense events (e.g., crime, court cases) may trigger higher statistical risk scores due to stylistic vocabulary overlap with sensational fake news.
     * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction. Evaluating an article body without an explicit headline reduces feature space density, which can lower probabilistic accuracy or cause borderline confidence scores.
