@@ -407,8 +407,8 @@ with tab_docs:
     * **Intended Input:** English news articles, headlines, and written journalistic content.
     
     ### 2. Multi-Tier Architecture
-    1. **Live Fact-Check Lookup:** Queries Google Fact Check API for explicitly debunked claims.
-    2. **Global Archive Cross-Reference:** Queries the GDELT DOC API to verify historical publication records across worldwide press archives.
+    1. **Global Archive Cross-Reference:** Queries the GDELT DOC API to verify historical publication records across worldwide press archives.
+    2. **Live Fact-Check Lookup:** Queries Google Fact Check API for explicitly debunked claims.
     3. **Transformer Feature Extraction:** Uses `DistilBERT` (Sentiment) and `DistilRoBERTa` (Emotion Analysis).
     4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
     
