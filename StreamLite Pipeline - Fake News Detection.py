@@ -167,6 +167,7 @@ def load_ml_components():
 
 @st.cache_resource
 def load_nlp_pipelines():
+    # Lightweight Sentiment Analysis (~250MB RAM)
     sentiment_pipe = pipeline(
         "text-classification",
         model="distilbert-base-uncased-finetuned-sst-2-english",
@@ -175,6 +176,7 @@ def load_nlp_pipelines():
         max_length=512,
     )
     
+    # Lightweight Emotion Detection (~260MB RAM)
     emotion_pipe = pipeline(
         "text-classification",
         model="bhadresh-savani/distilbert-base-uncased-emotion",
@@ -183,11 +185,13 @@ def load_nlp_pipelines():
         max_length=512,
     )
 
+    # Force Python Garbage Collection
     gc.collect()
 
     return sentiment_pipe, emotion_pipe
 
 
+# Initialization Handler with Explicit Diagnostic Errors
 weights_loaded = True
 init_error_msg = ""
 
@@ -214,9 +218,10 @@ if not weights_loaded:
     )
 
 # ---------------------------------------------------------
-# 3. EXTERNAL APIS & FLEXIBLE KEYWORD EXTRACTION
+# 3. EXTERNAL FACT-CHECKING & FLEXIBLE NEWS HUB APIs
 # ---------------------------------------------------------
 def check_google_factcheck(user_title, user_text, google_api_key):
+    """Fallback search using title first, then first sentence of body."""
     if not google_api_key or google_api_key == "YOUR_GOOGLE_API_KEY_HERE":
         return 0, None
 
@@ -249,13 +254,18 @@ def check_google_factcheck(user_title, user_text, google_api_key):
     return 0, None
 
 def check_news_hub(user_title, user_text, news_api_key):
+    """
+    Queries GNews API using flexible keyword extraction to maximize match rates.
+    """
     if not news_api_key:
         return 0, None, None
 
+    # Combine title and text snippet for keyword parsing
     raw_str = f"{user_title} {user_text[:200]}".strip()
     if not raw_str:
         return 0, None, None
 
+    # Filter out common stop words to build a flexible keyword query string
     stop_words = {
         "the", "a", "an", "in", "on", "at", "by", "for", "with", "and", 
         "or", "but", "to", "of", "is", "are", "was", "were", "it", "that", 
@@ -263,6 +273,7 @@ def check_news_hub(user_title, user_text, news_api_key):
     }
     words = [w for w in raw_str.split() if w.lower() not in stop_words and len(w) > 2]
     
+    # Take top 5 core keywords for flexible matching
     flexible_query = " ".join(words[:5])
     if not flexible_query:
         flexible_query = raw_str[:50]
@@ -292,9 +303,9 @@ def check_news_hub(user_title, user_text, news_api_key):
     return 0, None, None
 
 # ---------------------------------------------------------
-# 4. INFERENCE ENGINE WITH HISTORICAL TOGGLE SUPPORT
+# 4. INFERENCE ENGINE WITH OVERRIDE LOGIC & BALANCED THRESHOLDS
 # ---------------------------------------------------------
-def predict_article(user_title, user_text, google_api_key, news_api_key=None, is_historical=False):
+def predict_article(user_title, user_text, google_api_key, news_api_key=None):
     fully_combined_article = f"{user_title} {user_text}".strip()
 
     # Step A: Dynamic NLP Inference
@@ -314,16 +325,9 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None, is
     fact_flag, api_rating = check_google_factcheck(
         user_title, user_text, google_api_key
     )
-    
-    # If historical toggle is checked, bypass live search constraints
-    if is_historical:
-        news_found = 1
-        publisher_name = "Archived / Historical Verified Source"
-        article_url = "#"
-    else:
-        news_found, publisher_name, article_url = check_news_hub(
-            user_title, user_text, news_api_key
-        )
+    news_found, publisher_name, article_url = check_news_hub(
+        user_title, user_text, news_api_key
+    )
 
     # Step C: Metadata Calculations & Capping Bounds
     TRAIN_MAX_CHAR = 32655
@@ -368,33 +372,48 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None, is
 
     # Step E: Model Statistical Prediction
     raw_pred = fake_news_model.predict(X_final)[0]
-    raw_prob = fake_news_model.predict_proba(X_final)[0][1]
+    raw_prob = fake_news_model.predict_proba(X_final)[0][1]  # Prob of Class 1 (Real)
 
-    # Step F: Database Overrides & Historical Handling
+    # Step F: Database Overrides & Balanced Neutral Band Logic
     final_prediction = raw_pred
     final_prob = raw_prob
     override_applied = False
     confidence_level = "High"
 
+    # 1. PRIORITY 1: Google Fact Check Database Match
     if fact_flag == 1 and api_rating:
         rating_lower = api_rating.lower()
-        if any(term in rating_lower for term in ["false", "fake", "incorrect", "misleading", "pants on fire"]):
+        if any(
+            term in rating_lower
+            for term in [
+                "false",
+                "fake",
+                "incorrect",
+                "misleading",
+                "pants on fire",
+            ]
+        ):
             final_prediction = 0
             final_prob = 0.05
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
-        elif any(term in rating_lower for term in ["true", "accurate", "correct", "verified"]):
+        elif any(
+            term in rating_lower
+            for term in ["true", "accurate", "correct", "verified"]
+        ):
             final_prediction = 1
             final_prob = 0.95
             override_applied = True
             confidence_level = "High (Fact-Check Override)"
 
+    # 2. PRIORITY 2: News Hub Match
     elif news_found == 1:
         final_prediction = 1
-        final_prob = max(raw_prob, 0.95) if is_historical else max(raw_prob, 0.95)
+        final_prob = max(raw_prob, 0.95)
         override_applied = True
         confidence_level = f"High (Verified Source: {publisher_name})"
 
+    # 3. PRIORITY 3: Balanced Soft Thresholding for API Misses / Older Articles
     if not override_applied:
         if 0.38 <= final_prob <= 0.62:
             confidence_level = "Moderate"
@@ -425,7 +444,7 @@ def predict_article(user_title, user_text, google_api_key, news_api_key=None, is
 # ---------------------------------------------------------
 with st.sidebar:
     st.markdown(
-        "<span class='metric-badge'>v2.5 Production Engine</span>",
+        "<span class='metric-badge'>v2.4 Production Engine</span>",
         unsafe_allow_html=True,
     )
     st.title("🛡️ Engine Specs")
@@ -481,13 +500,6 @@ with tab_app:
             placeholder="Paste article body text here...",
         )
 
-        # 👈 ADDED: Historical / Archived Article Manual Override Toggle
-        is_historical = st.checkbox(
-            "📂 Historical / Archived Article (Bypass Live API Lookups)",
-            value=False,
-            help="Check this box if testing an older article from weeks or months ago to bypass live API search restrictions and treat it as a verified reference piece."
-        )
-
         analyze_btn = st.button("⚡ Run Verification Engine")
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -507,7 +519,7 @@ with tab_app:
                 )
             else:
                 with st.spinner(
-                    "Running NLP models (DistilBERT & Emotion) and evaluation pipelines..."
+                    "Running NLP models (DistilBERT & Emotion) and querying external databases..."
                 ):
                     google_api_key = st.secrets.get(
                         "GOOGLE_FACTCHECK_API_KEY", None
@@ -520,7 +532,6 @@ with tab_app:
                             user_text=user_text,
                             google_api_key=google_api_key,
                             news_api_key=news_api_key,
-                            is_historical=is_historical,
                         )
                     except Exception as eval_err:
                         st.error(f"Inference Engine Error: {eval_err}")
@@ -528,12 +539,14 @@ with tab_app:
         if st.session_state.results is not None:
             res = st.session_state.results
 
+            # Metric Visualization Output
             if res.get("confidence_level") == "Moderate":
                 st.warning("⚠️ **Moderate Confidence Signal (Borderline / Mixed Case)**")
                 st.progress(float(res["probability"]))
                 st.info(
                     f"The engine scored this article with a probability of **{res['probability'] * 100:.2f}% Real**. "
-                    "Because this falls in the neutral zone, stylistic elements resemble mixed linguistic signals."
+                    "Because this falls in the neutral zone, stylistic elements resemble mixed linguistic signals. "
+                    "Cross-referencing with official news outlets is recommended."
                 )
             elif res["prediction"] == 1:
                 st.success("### ✅ VERIFIED: Likely Authentic News")
@@ -548,25 +561,29 @@ with tab_app:
                     f"**Risk Score:** `{(1 - res['probability']) * 100:.2f}%` Fake Probability"
                 )
 
+            # Fact-Check Database Override Banner
             if res.get("override_applied"):
                 st.info(
-                    "ℹ️ Output overridden by explicit match or manual historical verification flag."
+                    "ℹ️ Output overridden by explicit match in external Fact-Check or News Hub database."
                 )
 
             st.divider()
 
+            # Live Media Index Cross-Reference
             st.markdown("**Live Media Index Cross-Reference:**")
             if res.get("news_found") == 1:
                 st.success(
                     f"🗞️ **Verified Publication Found!**\n\n"
-                    f"Source: **{res['publisher_name']}**"
+                    f"Published on **{res['publisher_name']}** "
+                    f"([View Original Source]({res['article_url']}))"
                 )
             else:
                 st.warning(
                     "No live news index match found on GNews API. "
-                    "(Tip: Check the 'Historical / Archived Article' box above if testing older reporting)."
+                    "(Note: GNews Free Tier enforces a 30-day historical window and 12-hour breaking delay)."
                 )
 
+            # Fact-Check Registry Status
             st.markdown("**Fact-Check Registry Status:**")
             if res["fact_flag"] == 1:
                 st.success(
@@ -574,16 +591,18 @@ with tab_app:
                 )
             else:
                 st.info(
-                    "No direct match in Google Fact Check registry (Standard for unflagged news reporting)."
+                    "No direct match in Google Fact Check registry (Standard for news that hasn't been flagged or debunked)."
                 )
 
             st.divider()
 
+            # Detected NLP Metrics
             st.markdown("**Automated Transformer Feature Extraction:**")
             ncol1, ncol2 = st.columns(2)
             ncol1.info(f"**Sentiment:** {res['sentiment'].capitalize()}")
             ncol2.info(f"**Dominant Emotion:** {res['emotion'].capitalize()}")
 
+            # Structural Metadata
             st.markdown("**Structural Article Metadata:**")
             mcol1, mcol2, mcol3 = st.columns(3)
             mcol1.metric("Word Count", f"{res['word_count']}")
@@ -605,15 +624,17 @@ with tab_docs:
     ### 1. Intended Use & Target Scope
     * **Purpose:** Automated misinformation risk detection and media cross-referencing prototype.
     * **Intended Input:** English news articles, headlines, and written journalistic content.
+    * **Out-of-Scope:** Satire, raw transcripts without context, non-English text, and real-time social media posts.
     
     ### 2. Multi-Tier Architecture
     1. **Live Fact-Check Lookup:** Queries Google Fact Check API for debunked claims.
-    2. **Live Media Cross-Reference & Historical Override:** Queries GNews API or applies manual archival flags for older coverage.
+    2. **Live Media Cross-Reference:** Queries GNews API using flexible keyword extraction to verify publication on tier-1 news outlets.
     3. **Transformer Feature Extraction:** Uses `DistilBERT` (Sentiment) and `DistilRoBERTa` (Emotion Analysis).
     4. **Statistical Classification:** Uses $L_1$-regularized Logistic Regression trained on TF-IDF n-grams and capped structural metadata.
     
     ### 3. Known Limitations & Failure Modes
-    * **Free-Tier API Historical Limit:** GNews free-tier limits live archive access to the last 30 days. Use the manual historical toggle for testing older articles.
-    * **Sensational Language Sensitivities:** Legitimate news articles covering emotionally intense events may trigger higher statistical risk scores due to stylistic vocabulary overlap with sensational fake news.
-    * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction.
+    * **Free-Tier API Historical Limit:** GNews free-tier limits historical archive access to the last 30 days. Articles published weeks or months ago will not return live news matches via API lookup and will rely on statistical text analysis.
+    * **Unindexed Reporting:** Google Fact Check API indexes debunked claims, not standard mainstream reporting. Authentic articles naturally show *"No direct match in registry."*
+    * **Sensational Language Sensitivities:** Legitimate news articles covering emotionally intense events (e.g., crime, court cases) may trigger higher statistical risk scores due to stylistic vocabulary overlap with sensational fake news.
+    * **Headline & Title Dependency:** The statistical engine heavily weights title n-grams during feature extraction. Evaluating an article body without an explicit headline reduces feature space density, which can lower probabilistic accuracy or cause borderline confidence scores.
     """)
