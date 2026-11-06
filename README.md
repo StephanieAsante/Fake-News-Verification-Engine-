@@ -13,7 +13,7 @@ Veritas AI is an end-to-end Machine Learning pipeline and interactive Streamlit 
 
 * **Hybrid Text & Metadata Vectorization:** Combines n-gram TF-IDF representations of `fully_combined_article` with structural text features (`char_count`, `word_count`, `avg_word_len`).
 * **Zero-Bias Categorical Encoding:** One-hot encodes nominal NLP signals (`predicted_sentiment` & `predicted_emotion`) without introducing rank bias.
-* **Regularized Feature Selection:** L_2 Lasso regularization eliminates uninformative text tokens, reducing overfitting and optimizing inference speed.
+* **Regularized Feature Selection:** L_2 Ridge regularization eliminates uninformative text tokens, reducing overfitting and optimizing inference speed.
 * **Modern Dark-Mode UI:** Glassmorphism dashboard with dynamic probability indicators and detailed verification metrics.
 
 ---
